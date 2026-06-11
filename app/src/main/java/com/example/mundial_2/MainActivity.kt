@@ -1,5 +1,7 @@
 package com.example.mundial_2
 
+import android.content.Context
+import android.media.MediaPlayer
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -7,42 +9,81 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import com.example.mundial_2.ui.theme.Mundial_2Theme
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+
+val Context.dataStore by preferencesDataStore(name = "mundial_scores")
 
 class MainActivity : ComponentActivity() {
+    private var mediaPlayer: MediaPlayer? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Play startup sound
+        playStartupSound()
+
         setContent {
             Mundial_2Theme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    topBar = { Header() }
-                ) { innerPadding ->
-                    MundialScreen(modifier = Modifier.padding(innerPadding))
-                }
+                MundialApp()
             }
         }
+    }
+
+    private fun playStartupSound() {
+        try {
+            // We use the ID R.raw.inicio_mundial. 
+            // The user must place the file in res/raw/inicio_mundial.mp3
+            mediaPlayer = MediaPlayer.create(this, R.raw.inicio_mundial)
+            mediaPlayer?.start()
+            
+            // Auto stop after 6 seconds if it's longer
+            mediaPlayer?.setOnCompletionListener {
+                releaseMediaPlayer()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun releaseMediaPlayer() {
+        mediaPlayer?.release()
+        mediaPlayer = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        releaseMediaPlayer()
     }
 }
 
 @Immutable
 data class Team(val id: String, val name: String, val flag: String)
 
+@Immutable
 data class Match(
     val id: Int,
     val local: Team,
@@ -63,8 +104,89 @@ data class TeamStats(
     var pts: Int = 0
 )
 
+@Immutable
+data class Group(val name: String, val teams: List<Team>, val matches: List<Match>)
+
+object WorldCupData {
+    val groups = listOf(
+        createGroup("A", "México", "🇲🇽", "Sudáfrica", "🇿🇦", "Corea del Sur", "🇰🇷", "Chequia", "🇨🇿"),
+        createGroup("B", "Canadá", "🇨🇦", "Bosnia", "🇧🇦", "Qatar", "🇶🇦", "Suiza", "🇨🇭"),
+        createGroup("C", "Brasil", "🇧🇷", "Marruecos", "🇲🇦", "Haití", "🇭🇹", "Escocia", "🏴󠁧󠁢󠁳󠁣󠁴󠁿"),
+        createGroup("D", "USA", "🇺🇸", "Paraguay", "🇵🇾", "Australia", "🇦🇺", "Turquía", "🇹🇷"),
+        createGroup("E", "Alemania", "🇩🇪", "Curazao", "🇨🇼", "Costa de Marfil", "🇨🇮", "Ecuador", "🇪🇨"),
+        createGroup("F", "Países Bajos", "🇳🇱", "Japón", "🇯🇵", "Suecia", "🇸🇪", "Túnez", "🇹🇳"),
+        createGroup("G", "Bélgica", "🇧🇪", "Egipto", "🇪🇬", "Irán", "🇮🇷", "Nueva Zelanda", "🇳🇿"),
+        createGroup("H", "España", "🇪🇸", "Cabo Verde", "🇨🇻", "Arabia Saudita", "🇸🇦", "Uruguay", "🇺🇾"),
+        createGroup("I", "Francia", "🇫🇷", "Senegal", "🇸🇳", "Irak", "🇮🇶", "Noruega", "🇳🇴"),
+        createGroup("J", "Argentina", "🇦🇷", "Argelia", "🇩🇿", "Austria", "🇦🇹", "Jordania", "🇯🇴"),
+        createGroup("K", "Portugal", "🇵🇹", "RD Congo", "🇨🇩", "Uzbekistán", "🇺🇿", "Colombia", "🇨🇴"),
+        createGroup("L", "Inglaterra", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Croacia", "🇭🇷", "Ghana", "🇬🇭", "Panamá", "🇵🇦")
+    )
+
+    private fun createGroup(name: String, t1n: String, t1f: String, t2n: String, t2f: String, t3n: String, t3f: String, t4n: String, t4f: String): Group {
+        val teams = listOf(
+            Team("${name}_1", t1n, t1f),
+            Team("${name}_2", t2n, t2f),
+            Team("${name}_3", t3n, t3f),
+            Team("${name}_4", t4n, t4f)
+        )
+        val matches = listOf(
+            Match(1, teams[0], teams[1]),
+            Match(2, teams[2], teams[3]),
+            Match(3, teams[0], teams[2]),
+            Match(4, teams[1], teams[3]),
+            Match(5, teams[3], teams[0]),
+            Match(6, teams[2], teams[1])
+        )
+        return Group(name, teams, matches)
+    }
+}
+
 @Composable
-fun Header() {
+fun MundialApp() {
+    var selectedGroupIndex by remember { mutableIntStateOf(0) }
+    val selectedGroup = remember(selectedGroupIndex) { WorldCupData.groups[selectedGroupIndex] }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = { Header(selectedGroup.name) }
+    ) { innerPadding ->
+        Column(modifier = Modifier.padding(innerPadding)) {
+            GroupSelector(
+                selectedIndex = selectedGroupIndex,
+                onGroupSelected = { selectedGroupIndex = it }
+            )
+            MundialScreen(group = selectedGroup)
+        }
+    }
+}
+
+@Composable
+fun GroupSelector(selectedIndex: Int, onGroupSelected: (Int) -> Unit) {
+    ScrollableTabRow(
+        selectedTabIndex = selectedIndex,
+        edgePadding = 16.dp,
+        containerColor = Color(0xFF0D1B3E),
+        contentColor = Color.White,
+        indicator = { tabPositions ->
+            TabRowDefaults.SecondaryIndicator(
+                Modifier.tabIndicatorOffset(tabPositions[selectedIndex]),
+                color = Color(0xFFFF9800)
+            )
+        }
+    ) {
+        WorldCupData.groups.forEachIndexed { index, group ->
+            Tab(
+                selected = selectedIndex == index,
+                onClick = { onGroupSelected(index) },
+                text = { Text("Grupo ${group.name}", fontSize = 12.sp) }
+            )
+        }
+    }
+}
+
+@Composable
+fun Header(groupName: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -81,7 +203,7 @@ fun Header() {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "GRUPO A",
+                text = "GRUPO $groupName",
                 color = Color(0xFFFF9800),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold
@@ -91,59 +213,65 @@ fun Header() {
 }
 
 @Composable
-fun MundialScreen(modifier: Modifier = Modifier) {
-    val teams = remember {
-        listOf(
-            Team("MX", "México", "🇲🇽"),
-            Team("KR", "Corea del Sur", "🇰🇷"),
-            Team("CZ", "República Checa", "🇨🇿"),
-            Team("ZA", "Sudáfrica", "🇿🇦")
-        )
+fun MundialScreen(group: Group) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Optimized DataStore observation
+    val savedScoresFlow = remember(group.name) {
+        context.dataStore.data.map { prefs ->
+            group.matches.associate { match ->
+                val localKey = "match_${group.name}_${match.id}_local"
+                val visitorKey = "match_${group.name}_${match.id}_visitor"
+                match.id to (Pair(prefs[stringPreferencesKey(localKey)] ?: "", prefs[stringPreferencesKey(visitorKey)] ?: ""))
+            }
+        }
+    }
+    val savedScores by savedScoresFlow.collectAsState(initial = emptyMap())
+
+    // Derived state for matches to minimize recomposition
+    val matches = remember(group, savedScores) {
+        group.matches.map { match ->
+            val scores = savedScores[match.id] ?: Pair("", "")
+            match.copy(localScore = scores.first, visitorScore = scores.second)
+        }
     }
 
-    var matches by remember {
-        mutableStateOf(
-            listOf(
-                Match(1, teams[0], teams[3]), // MX vs ZA
-                Match(2, teams[1], teams[2]), // KR vs CZ
-                Match(3, teams[2], teams[3]), // CZ vs ZA
-                Match(4, teams[0], teams[1]), // MX vs KR
-                Match(5, teams[2], teams[0]), // CZ vs MX
-                Match(6, teams[3], teams[1])  // ZA vs KR
-            )
-        )
-    }
-
+    // Derived state for standings calculation
     val standings = remember(matches) {
-        calculateStandings(teams, matches)
+        calculateStandings(group.teams, matches)
     }
 
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
-            .padding(horizontal = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = 10.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "PARTIDOS DEL GRUPO A",
+            text = "PARTIDOS DEL GRUPO ${group.name}",
             fontWeight = FontWeight.Bold,
             fontSize = 13.sp,
             modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
         )
 
         matches.forEach { match ->
-            MatchCard(
-                match = match,
-                onScoreChange = { localScore, visitorScore ->
-                    matches = matches.map {
-                        if (it.id == match.id) it.copy(localScore = localScore, visitorScore = visitorScore)
-                        else it
+            key(match.id) {
+                MatchCard(
+                    match = match,
+                    onScoreChange = { localScore, visitorScore ->
+                        scope.launch {
+                            context.dataStore.edit { prefs ->
+                                prefs[stringPreferencesKey("match_${group.name}_${match.id}_local")] = localScore
+                                prefs[stringPreferencesKey("match_${group.name}_${match.id}_visitor")] = visitorScore
+                            }
+                        }
                     }
-                }
-            )
-            Spacer(modifier = Modifier.height(5.dp))
+                )
+                Spacer(modifier = Modifier.height(5.dp))
+            }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -300,24 +428,26 @@ fun StandingsTable(standings: List<TeamStats>) {
         }
 
         standings.forEachIndexed { index, stats ->
-            HorizontalDivider(color = Color.LightGray, thickness = 0.5.dp)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TableCell(text = "${index + 1}", weight = 0.6f, isPos = true, pos = index + 1)
-                Row(modifier = Modifier.weight(2.6f), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = stats.team.flag, modifier = Modifier.padding(horizontal = 3.dp), fontSize = 11.sp)
-                    Text(text = stats.team.name, fontSize = 8.5.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            key(stats.team.id) {
+                HorizontalDivider(color = Color.LightGray, thickness = 0.5.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TableCell(text = "${index + 1}", weight = 0.6f, isPos = true, pos = index + 1)
+                    Row(modifier = Modifier.weight(2.6f), verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = stats.team.flag, modifier = Modifier.padding(horizontal = 3.dp), fontSize = 11.sp)
+                        Text(text = stats.team.name, fontSize = 8.5.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                    }
+                    TableCell(text = "${stats.jj}", weight = 0.6f)
+                    TableCell(text = "${stats.jg}", weight = 0.6f)
+                    TableCell(text = "${stats.je}", weight = 0.6f)
+                    TableCell(text = "${stats.jp}", weight = 0.6f)
+                    TableCell(text = "${stats.gf}", weight = 0.6f)
+                    TableCell(text = "${stats.gc}", weight = 0.6f)
+                    TableCell(text = "${if (stats.dg > 0) "+" else ""}${stats.dg}", weight = 0.6f)
+                    TableCell(text = "${stats.pts}", weight = 0.8f, fontWeight = FontWeight.Bold, color = Color(0xFF0D1B3E))
                 }
-                TableCell(text = "${stats.jj}", weight = 0.6f)
-                TableCell(text = "${stats.jg}", weight = 0.6f)
-                TableCell(text = "${stats.je}", weight = 0.6f)
-                TableCell(text = "${stats.jp}", weight = 0.6f)
-                TableCell(text = "${stats.gf}", weight = 0.6f)
-                TableCell(text = "${stats.gc}", weight = 0.6f)
-                TableCell(text = "${if (stats.dg > 0) "+" else ""}${stats.dg}", weight = 0.6f)
-                TableCell(text = "${stats.pts}", weight = 0.8f, fontWeight = FontWeight.Bold, color = Color(0xFF0D1B3E))
             }
         }
     }
@@ -403,8 +533,8 @@ fun calculateStandings(teams: List<Team>, matches: List<Match>): List<TeamStats>
         val visitorScore = match.visitorScore.toIntOrNull()
 
         if (localScore != null && visitorScore != null) {
-            val localStats = statsMap[match.local.id]!!
-            val visitorStats = statsMap[match.visitor.id]!!
+            val localStats = statsMap[match.local.id] ?: return@forEach
+            val visitorStats = statsMap[match.visitor.id] ?: return@forEach
 
             localStats.jj++
             visitorStats.jj++
@@ -449,8 +579,6 @@ fun calculateStandings(teams: List<Team>, matches: List<Match>): List<TeamStats>
 @Composable
 fun MundialPreview() {
     Mundial_2Theme {
-        Scaffold(topBar = { Header() }) { innerPadding ->
-            MundialScreen(modifier = Modifier.padding(innerPadding))
-        }
+        MundialApp()
     }
 }
