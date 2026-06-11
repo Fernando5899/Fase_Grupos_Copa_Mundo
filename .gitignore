@@ -1,0 +1,57 @@
+# --- Gradle y Compilación ---
+.gradle/
+build/
+*/build/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# --- Kotlin ---
+.kotlin/
+kotlin-binaries.xml
+
+# --- Android Studio / IntelliJ / VS Code ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+cmake-build-*/
+.vscode/
+
+# --- Binarios y Generados ---
+*.apk
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+
+# --- Configuración Local y Secretos ---
+# Estos archivos contienen rutas locales o llaves privadas
+local.properties
+secrets.properties
+google-services.json
+
+# --- Firma de la App (Seguridad Crítica) ---
+# NUNCA subas tus archivos de firma (.jks, .keystore) a GitHub
+*.jks
+*.keystore
+*.p12
+key.properties
+signing.properties
+
+# --- Archivos del Sistema ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Otros ---
+*.log
+*.bak
+*.swp
+*~
+.temp
+.tmp
